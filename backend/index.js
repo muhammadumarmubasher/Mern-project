@@ -27,9 +27,10 @@ app.use(
     cors({
 
         origin:[
-            "http://localhost:3000",
-            "https://ai-edu-mern.onrender.com"
-        ],
+    "http://localhost:3000",
+    "https://ai-edu-mern.onrender.com",
+    "https://mern-project-1-5nhf.onrender.com"
+],
 
         methods:[
             "GET",
