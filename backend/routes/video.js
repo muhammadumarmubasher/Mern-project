@@ -665,30 +665,33 @@ console.log("VIDEO URL:", youtubeUrl);
 console.log("====================================");
 
 
+console.log("========== BEFORE SAVE ==========");
+console.log("USER:", req.userId);
+console.log("URL:", youtubeUrl);
+console.log("OPTION:", option);
+
+
 await AnalysisHistory.create({
 
-user:req.userId,
+    user:req.userId,
 
-youtubeUrl,
+    youtubeUrl,
 
-option,
+    option,
 
-summary:
-result.summary || "",
+    summary:
+    result.summary || "",
 
-quiz:
-result.quiz || [],
+    quiz:
+    result.quiz || [],
 
-explanation:
-result.explanation || ""
+    explanation:
+    result.explanation || ""
 
 });
 
 
-console.log("========== HISTORY SAVED ==========");
-
-
-
+console.log("========== AFTER SAVE ==========");
 
 return res.json({
 
