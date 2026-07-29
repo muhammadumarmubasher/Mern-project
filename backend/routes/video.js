@@ -1,5 +1,6 @@
 const express = require("express");
 const router = express.Router();
+
 require("dotenv").config();
 
 const Groq = require("groq-sdk");
@@ -9,47 +10,91 @@ const { YoutubeTranscript } = require("youtube-transcript");
 const auth = require("../middleware/auth");
 const AnalysisHistory = require("../models/AnalysisHistory");
 
-const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
+
+const groq = new Groq({
+    apiKey: process.env.GROQ_API_KEY
+});
+
+
+// ===============================
+// YouTube Helpers
+// ===============================
 
 function getVideoId(url) {
-    const match = url.match(/(?:v=|youtu\.be\/|embed\/|shorts\/)([A-Za-z0-9_-]{11})/);
+
+    const match = url.match(
+        /(?:v=|youtu\.be\/|embed\/|shorts\/)([A-Za-z0-9_-]{11})/
+    );
+
     return match ? match[1] : null;
+
 }
-function isValidYoutubeUrl(url){
+
+
+
+function isValidYoutubeUrl(url) {
 
     return (
         url.includes("youtube.com") ||
         url.includes("youtu.be")
     );
+
 }
+
+
+
+// ===============================
+// Get Video Data
+// ===============================
 
 async function getVideoInfo(url) {
 
-    const data = {
+    const video = {
+
         title: "",
         description: "",
         transcript: ""
+
     };
+
+
+    const videoId = getVideoId(url);
+
+
+    if (!videoId) {
+
+        throw new Error("Invalid YouTube URL");
+
+    }
+
+
+
+    // Get title and description
 
     try {
 
-        const videoId = getVideoId(url);
-
-        if (!videoId) {
-            throw new Error("Invalid YouTube URL");
-        }
-
         const youtube = await Innertube.create();
+
         const info = await youtube.getInfo(videoId);
 
-        data.title = info.basic_info?.title || "";
-        data.description = info.basic_info?.short_description || "";
 
-        console.log("Video info found");
+        video.title =
+            info.basic_info?.title || "";
+
+
+        video.description =
+            info.basic_info?.short_description || "";
+
+
+        console.log("Video information loaded");
+
+
+        // Try youtube captions
 
         try {
 
             const captions = info.captions;
+
 
             if (
                 captions &&
@@ -57,163 +102,235 @@ async function getVideoInfo(url) {
                 captions.caption_tracks.length
             ) {
 
-                const caption = await captions.caption_tracks[0].fetch();
 
-                data.transcript = caption.events
-                    .map(event =>
-                        event.segs
-                            ? event.segs.map(seg => seg.utf8).join("")
-                            : ""
-                    )
-                    .join(" ");
+                const caption =
+                    await captions.caption_tracks[0].fetch();
 
-                console.log("Captions found");
+
+
+                video.transcript =
+                    caption.events
+                        .map(event => {
+
+                            if (event.segs) {
+
+                                return event.segs
+                                    .map(seg => seg.utf8)
+                                    .join("");
+
+                            }
+
+                            return "";
+
+                        })
+                        .join(" ");
+
+
+
+                console.log("Transcript loaded from captions");
+
             }
+
 
         } catch {
 
-            console.log("youtubei captions unavailable");
+            console.log("No youtube captions");
 
         }
 
-    } catch (error) {
 
-        console.log("youtubei:", error.message);
+    } catch(error) {
+
+        console.log(
+            "YouTube info error:",
+            error.message
+        );
 
     }
 
-    if (!data.transcript) {
+
+
+    // Transcript fallback
+
+    if (!video.transcript) {
+
 
         try {
+
 
             const transcript =
                 await YoutubeTranscript.fetchTranscript(url);
 
-            data.transcript = transcript
-                .map(item => item.text)
-                .join(" ");
+
+
+            video.transcript =
+                transcript
+                    .map(item => item.text)
+                    .join(" ");
+
+
 
             console.log("Transcript fallback used");
 
+
         } catch {
 
-            console.log("Transcript unavailable");
+
+            console.log("Transcript not available");
+
 
         }
 
+
     }
 
-    if (!data.title) {
+
+
+    // Title fallback
+
+    if (!video.title) {
+
 
         try {
 
+
             const response = await fetch(
+
                 `https://www.youtube.com/oembed?url=${encodeURIComponent(url)}&format=json`
+
             );
 
-            const info = await response.json();
 
-            data.title = info.title || "";
+            const data = await response.json();
 
-        } catch {}
+
+            video.title =
+                data.title || "";
+
+
+
+        } catch {
+
+
+            console.log("Title fallback failed");
+
+
+        }
+
 
     }
 
-    return data;
+
+
+    console.log("----------------------------");
+    console.log("TITLE:", video.title);
+    console.log(
+        "TRANSCRIPT:",
+        video.transcript ? "Available" : "Not Available"
+    );
+    console.log("----------------------------");
+
+
+
+    return video;
+
 }
+
+// ===============================
+// Fallback Data
+// ===============================
+
 const fallback = {
-
-    summary:
-    "This lecture explains important concepts and provides useful information for learners.",
-
+    summary:"This lecture explains important concepts and provides useful learning material.",
     quiz:[
         {
-            question:"What is the main purpose of this lecture?",
-            answer:"The lecture helps students understand important concepts."
+            question:"What is the main topic of this lecture?",
+            answer:"The lecture explains important concepts related to the topic."
         }
     ],
-
-    explanation:
-    "This lecture provides educational information and helps learners understand the topic clearly."
-
+    explanation:"This lecture helps students understand the topic in a simple way."
 };
 
+
+// ===============================
+// Category Based Responses
+// ===============================
 
 const categories = {
 
     python:{
-        summary:
-        "This lecture explains Python programming concepts and software development basics.",
-
+        summary:"This lecture explains Python programming concepts, coding basics and software development.",
         quiz:[
             {
                 question:"What is Python?",
-                answer:"Python is a programming language used for software development."
+                answer:"Python is a high-level programming language used for software development."
             }
         ],
-
-        explanation:
-        "Python is a beginner friendly programming language used to create applications."
+        explanation:"Python is used for web development, automation, AI and data science."
     },
 
 
     ai:{
-        summary:
-        "This lecture explains Artificial Intelligence and machine learning concepts.",
-
+        summary:"This lecture explains Artificial Intelligence and Machine Learning concepts.",
         quiz:[
             {
                 question:"What is Artificial Intelligence?",
-                answer:"AI enables machines to perform tasks that normally require human intelligence."
+                answer:"AI allows machines to perform tasks that normally require human intelligence."
             }
         ],
-
-        explanation:
-        "AI uses data and algorithms to solve problems and improve decisions."
+        explanation:"AI uses algorithms and data to solve problems and make intelligent decisions."
     },
 
 
     motivation:{
-        summary:
-        "This lecture focuses on motivation, discipline and personal growth.",
-
+        summary:"This lecture discusses motivation, discipline and personal growth.",
         quiz:[
             {
                 question:"What helps achieve success?",
-                answer:"Consistency and discipline help achieve long term success."
+                answer:"Consistency and discipline help people achieve long term success."
             }
         ],
-
-        explanation:
-        "Motivation helps people start while discipline helps them continue."
+        explanation:"Motivation helps people start while discipline helps them continue."
     }
 
 };
 
 
+// ===============================
+// Category Detection
+// ===============================
 
-function detectCategory(title) {
+function detectCategory(title=""){
 
     title = title.toLowerCase();
 
-    if (
+
+    if(
         title.includes("python") ||
-        title.includes("coding") ||
-        title.includes("programming")
-    ) return "python";
+        title.includes("programming") ||
+        title.includes("coding")
+    ){
+        return "python";
+    }
 
 
-    if (
-        title.includes("ai") ||
-        title.includes("machine learning")
-    ) return "ai";
+    if(
+        title.includes("artificial intelligence") ||
+        title.includes("machine learning") ||
+        title.includes("deep learning") ||
+        title.includes(" ai ")
+    ){
+        return "ai";
+    }
 
 
-    if (
+    if(
         title.includes("motivation") ||
         title.includes("success") ||
         title.includes("discipline")
-    ) return "motivation";
+    ){
+        return "motivation";
+    }
 
 
     return null;
@@ -221,52 +338,50 @@ function detectCategory(title) {
 }
 
 
+// ===============================
+// Filter Result
+// ===============================
 
-function filterResult(data, option) {
+function filterResult(data,option){
 
-    if(option === "summary") {
-
+    if(option==="summary"){
         return {
             summary:data.summary
         };
-
     }
 
 
-    if(option === "quiz") {
-
+    if(option==="quiz"){
         return {
             quiz:data.quiz
         };
-
     }
 
 
-    if(option === "explanation") {
-
+    if(option==="explanation"){
         return {
             explanation:data.explanation
         };
-
     }
 
 
     return data;
 
 }
+// ===============================
+// Generate AI Result
+// ===============================
 
-
-
-async function generateAIResult(video) {
+async function generateAIResult(video){
 
     const prompt = `
-
 You are an educational AI assistant.
 
-Analyze this lecture and return only JSON.
+Create educational content from this lecture.
+
+Return ONLY valid JSON.
 
 Format:
-
 {
 "summary":"",
 "quiz":[
@@ -278,20 +393,25 @@ Format:
 "explanation":""
 }
 
-
 Title:
 ${video.title}
-
 
 Description:
 ${video.description}
 
-
-Lecture:
-${video.transcript.substring(0,12000)}
-
+${
+video.transcript
+?
+`Transcript:
+${video.transcript.substring(0,12000)}`
+:
+`
+Transcript is unavailable.
+Use only title and description.
+Create useful educational content based on available information.
+`
+}
 `;
-
 
 
     const response = await groq.chat.completions.create({
@@ -311,10 +431,9 @@ ${video.transcript.substring(0,12000)}
 
 
 
-    let text = response
-        .choices[0]
-        .message
-        .content;
+    let text =
+        response.choices[0].message.content;
+
 
 
     text = text
@@ -324,34 +443,52 @@ ${video.transcript.substring(0,12000)}
 
 
 
-    try {
+    try{
 
-        const start = text.indexOf("{");
-        const end = text.lastIndexOf("}");
+
+        const start =
+            text.indexOf("{");
+
+
+        const end =
+            text.lastIndexOf("}");
+
 
         return JSON.parse(
             text.substring(start,end+1)
         );
 
-    } catch {
 
-        return fallback;
+    }catch(error){
+
+
+        console.log(
+            "JSON parsing failed"
+        );
+
+
+        throw new Error(
+            "Invalid AI response"
+        );
 
     }
 
 }
-router.post("/analyze", auth, async (req, res) => 
-    {
+// ===============================
+// Analyze Video Route
+// ===============================
 
-    try {
+router.post("/analyze",auth,async(req,res)=>{
+
+    try{
 
         const {
             youtubeUrl,
-            option = "all"
+            option="all"
         } = req.body;
 
 
-        if (!youtubeUrl) {
+        if(!youtubeUrl){
 
             return res.status(400).json({
                 success:false,
@@ -359,24 +496,21 @@ router.post("/analyze", auth, async (req, res) =>
             });
 
         }
+
+
         if(!isValidYoutubeUrl(youtubeUrl)){
 
-    return res.status(400).json({
+            return res.status(400).json({
+                success:false,
+                message:"Please enter a valid YouTube URL"
+            });
 
-        success:false,
-
-        message:"Please enter a valid YouTube URL"
-
-    });
-
-}
+        }
 
 
 
-        const video = await getVideoInfo(youtubeUrl);
-
-
-        console.log("TITLE:", video.title);
+        const video =
+            await getVideoInfo(youtubeUrl);
 
 
 
@@ -384,23 +518,53 @@ router.post("/analyze", auth, async (req, res) =>
 
 
 
-        if (video.transcript) {
+        try{
 
-            result = await generateAIResult(video);
 
-        } 
-        else {
+            console.log("Generating AI result...");
+
+
+            result =
+                await generateAIResult(video);
+
+
+
+        }catch(error){
+
+
+            console.log(
+                "AI failed:",
+                error.message
+            );
+
+
 
             const category =
                 detectCategory(video.title);
 
 
-            result =
-                category
-                ?
-                categories[category]
-                :
-                fallback;
+
+            if(category){
+
+
+                console.log(
+                    "Category fallback:",
+                    category
+                );
+
+
+                result =
+                    categories[category];
+
+
+            }else{
+
+
+                result =
+                    fallback;
+
+
+            }
 
         }
 
@@ -415,52 +579,54 @@ router.post("/analyze", auth, async (req, res) =>
             option,
 
             summary:
-            result.summary || "",
+                result.summary || "",
 
             quiz:
-            result.quiz || [],
+                result.quiz || [],
 
             explanation:
-            result.explanation || ""
+                result.explanation || ""
 
         });
 
 
 
-        res.json({
+        return res.json({
 
             success:true,
 
             data:
-            filterResult(
-                result,
-                option
-            )
+                filterResult(
+                    result,
+                    option
+                )
 
         });
 
 
 
-    }catch(error) {
+    }catch(error){
 
 
-    console.log(
-        "Analyzer Error:",
-        error.message
-    );
+        console.log(
+            "Analyzer Error:",
+            error.message
+        );
 
 
-    res.status(500).json({
+        return res.status(500).json({
 
-        success:false,
+            success:false,
 
-        message:"Unable to analyze this video"
+            message:"Unable to analyze this video"
 
-    });
+        });
 
 
-}
+    }
+
 });
+
 
 
 module.exports = router;
