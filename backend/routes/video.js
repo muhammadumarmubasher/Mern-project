@@ -659,6 +659,12 @@ result=fallback;
 
 // Save History
 
+console.log("========== SAVING HISTORY ==========");
+console.log("USER ID:", req.userId);
+console.log("VIDEO URL:", youtubeUrl);
+console.log("====================================");
+
+
 await AnalysisHistory.create({
 
 user:req.userId,
@@ -678,6 +684,8 @@ result.explanation || ""
 
 });
 
+
+console.log("========== HISTORY SAVED ==========");
 
 
 
