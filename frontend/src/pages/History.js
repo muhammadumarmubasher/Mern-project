@@ -18,7 +18,7 @@ function History(){
 
 
                 const res = await axios.get(
-                    "http://localhost:5000/api/history",
+                    "https://mern-project-b418.onrender.comb418.onrender.com/api/history",
                     {
                         headers:{
                             Authorization:`Bearer ${token}`

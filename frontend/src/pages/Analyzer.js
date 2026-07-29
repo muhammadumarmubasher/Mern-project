@@ -61,7 +61,7 @@ function Analyzer(){
             const response =
             await axios.post(
 
-                "http://localhost:5000/api/video/analyze",
+                "https://mern-project-b418.onrender.com/api/video/analyze",
 
                 {
                     youtubeUrl:url,

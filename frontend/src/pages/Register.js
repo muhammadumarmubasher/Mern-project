@@ -21,7 +21,7 @@ function Register(){
         try{
 
             await axios.post(
-                "http://localhost:5000/api/auth/register",
+                "https://mern-project-b418.onrender.com/api/auth/register",
                 {
                     name,
                     email,

@@ -103,7 +103,7 @@ npm run dev
 Backend runs on:
 
 ```
-http://localhost:5000
+https://mern-project-b418.onrender.com
 ```
 
 ---
